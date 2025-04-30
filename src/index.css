@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -103,12 +102,19 @@
   .healthcare-card {
     @apply bg-white rounded-lg shadow-md border border-healthcare-gray p-6 transition-all duration-300 hover:shadow-lg;
   }
-  
+
   .healthcare-btn-primary {
     @apply bg-healthcare-blue text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all;
   }
-  
+
   .healthcare-btn-secondary {
     @apply bg-healthcare-green text-white px-4 py-2 rounded-md hover:bg-opacity-90 transition-all;
   }
+}
+
+.bg-custom-image {
+  background-image: url("./assets//background.jpg");
+  background-size: cover;
+  background-position: cover;
+  min-height: 100vh; /* or whatever height you want */
 }
