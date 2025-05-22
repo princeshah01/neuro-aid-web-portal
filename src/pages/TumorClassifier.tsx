@@ -7,6 +7,29 @@ import { ArrowRight, CheckCircle, FileImage, Upload, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import useBlurOnScroll from "@/hooks/useBlurOnScroll";
 import { useChatbot } from "@/context/ChatbotProvider";
+import html2pdf from "html2pdf.js";
+
+const downloadPDF = () => {
+  const element = document.getElementById("pdf-content");
+  element.style.filter = "grayscale(100%)";
+  const opt = {
+    margin: 0.5,
+    filename: "Download.pdf",
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+  };
+
+  html2pdf()
+    .set(opt)
+    .from(element)
+    .save()
+    .then(() => {
+      // Remove the filter after saving
+      element.style.filter = "";
+    });
+};
+
 const TumorClassifier = () => {
   const { isOpen, toggleChatbot } = useChatbot();
   const isBlurred = useBlurOnScroll();
@@ -15,7 +38,8 @@ const TumorClassifier = () => {
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
-
+  const [analysedData, setAnalysedData] = useState(null);
+  console.log(analysedData);
   const handleFileUpload = (file: File) => {
     // Check if file is an image
     if (!file.type.startsWith("image/")) {
@@ -63,12 +87,37 @@ const TumorClassifier = () => {
     setAnalysisComplete(false);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
+    if (!uploadedFile) {
+      toast({
+        variant: "destructive",
+        title: "No file uploaded",
+        description: "Please upload an image file before analyzing.",
+        duration: 5000,
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
 
-    // Simulate analysis process
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    try {
+      const formData = new FormData();
+      formData.append("file", uploadedFile); // This is the key expected by the backend
+
+      const response = await fetch(
+        "http://127.0.0.1:5000/api/interface/predict",
+        {
+          method: "POST",
+          body: formData, // No need to set Content-Type manually
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze image.");
+      }
+
+      const data = await response.json();
+      setAnalysedData(data?.data);
       setAnalysisComplete(true);
 
       toast({
@@ -76,7 +125,18 @@ const TumorClassifier = () => {
         description: "Your MRI scan has been successfully analyzed.",
         duration: 5000,
       });
-    }, 3000);
+    } catch (error) {
+      console.error("Error analyzing image:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description:
+          "There was an error analyzing the image. Please try again.",
+        duration: 5000,
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -139,7 +199,7 @@ const TumorClassifier = () => {
                       </label>
                     </div>
                     <p className="mt-4 text-sm text-gray-500">
-                      Supports: DICOM, JPG, PNG (max 10MB)
+                      Supports: JPG, PNG (max 10MB)
                     </p>
                   </div>
                 ) : (
@@ -203,122 +263,120 @@ const TumorClassifier = () => {
 
               {/* Analysis Results */}
               {analysisComplete && (
-                <div className="mt-8 animate-fade-in">
-                  <div className="bg-healthcare-soft-green rounded-lg p-6 border border-healthcare-green">
-                    <div className="flex items-center">
-                      <CheckCircle className="h-6 w-6 text-healthcare-green mr-2" />
-                      <h3 className="text-xl font-semibold text-gray-800">
-                        Analysis Results
-                      </h3>
-                    </div>
-
-                    <div className="mt-6 grid md:grid-cols-2 gap-6">
-                      <div>
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-64 flex items-center justify-center">
-                          {/* Placeholder for the uploaded image */}
-                          <div className="text-gray-400">MRI Scan Image</div>
-                        </div>
+                <>
+                  <div id="pdf-content" className="mt-8 animate-fade-in">
+                    <div className="bg-healthcare-soft-green rounded-lg p-6 border border-healthcare-green">
+                      <div className="flex items-center">
+                        <CheckCircle className="h-6 w-6 text-healthcare-green mr-2" />
+                        <h3 className="text-xl font-semibold text-gray-800">
+                          Analysis Results
+                        </h3>
                       </div>
 
-                      <div>
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-64 overflow-y-auto">
-                          <h4 className="font-semibold text-gray-800">
-                            Classification Results:
-                          </h4>
+                      <div className="mt-6 grid md:grid-cols-2 gap-6">
+                        <div>
+                          <div className="bg-black rounded-lg shadow-sm border border-gray-200 p-4 h-64 flex items-center justify-center overflow-hidden">
+                            {/* Placeholder for the uploaded image */}
+                            <img
+                              src={URL.createObjectURL(uploadedFile)}
+                              alt="Uploaded MRI"
+                              className="max-w-full max-h-96 rounded shadow"
+                            />
+                          </div>
+                        </div>
 
-                          <div className="mt-4 space-y-3">
-                            <div>
-                              <p className="text-sm text-gray-600">
-                                Primary Classification:
-                              </p>
-                              <p className="font-medium">
-                                Meningioma (WHO Grade I)
-                              </p>
-                              <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-healthcare-blue h-2 rounded-full"
-                                  style={{ width: "87%" }}
-                                ></div>
-                              </div>
-                              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                <span>Confidence: 87%</span>
-                              </div>
-                            </div>
+                        <div>
+                          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 h-64 overflow-y-auto">
+                            <h4 className="font-semibold text-gray-800">
+                              Classification Results:
+                            </h4>
 
-                            <div>
-                              <p className="text-sm text-gray-600">
-                                Secondary Classification:
-                              </p>
-                              <p className="font-medium">
-                                Benign (Non-malignant)
-                              </p>
-                              <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-healthcare-green h-2 rounded-full"
-                                  style={{ width: "92%" }}
-                                ></div>
+                            <div className="mt-4 space-y-3">
+                              <div>
+                                <p className="text-sm text-gray-600">
+                                  Primary Classification:
+                                </p>
+                                <p className="font-medium">
+                                  {analysedData?.result}
+                                </p>
+                                <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-healthcare-green h-2 rounded-full"
+                                    style={{ width: "92%" }}
+                                  ></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                  <span>
+                                    Confidence: {analysedData.confidence * 100}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                                <span>Confidence: 92%</span>
-                              </div>
-                            </div>
 
-                            <div className="pt-2">
-                              <p className="text-sm text-gray-600 font-medium">
-                                Key Observations:
-                              </p>
-                              <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1 mt-2">
-                                <li>
-                                  Well-defined mass in the right frontal lobe
-                                </li>
-                                <li>No evidence of surrounding edema</li>
-                                <li>No midline shift observed</li>
-                                <li>
-                                  No signs of infiltration into adjacent
-                                  structures
-                                </li>
-                              </ul>
+                              <div className="pt-2">
+                                <p className="text-sm text-gray-600 font-medium">
+                                  Key Observations:
+                                </p>
+                                <ul className="text-sm text-gray-700 list-disc pl-5 space-y-1 mt-2">
+                                  <li>
+                                    Well-defined mass in the right frontal lobe
+                                  </li>
+                                  <li>No evidence of surrounding edema</li>
+                                  <li>No midline shift observed</li>
+                                  <li>
+                                    No signs of infiltration into adjacent
+                                    structures
+                                  </li>
+                                </ul>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                      <h4 className="font-semibold text-gray-800">
-                        AI Assessment Summary:
-                      </h4>
-                      <p className="mt-2 text-gray-700">
-                        The image analysis suggests a meningioma (WHO Grade I)
-                        with high confidence. The lesion appears well-defined
-                        with typical characteristics of a benign meningioma.
-                        There are no concerning features suggestive of
-                        malignancy or aggressive behavior.
-                      </p>
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-500 italic">
-                          Note: This is an AI-assisted analysis and should be
-                          reviewed by a qualified healthcare professional. This
-                          tool is not intended to replace clinical judgment or
-                          expertise.
-                        </p>
+                      <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <h4 className="font-semibold text-gray-800">
+                          Tumor Analysis Summary:
+                        </h4>
+                        <div className="mt-2 text-gray-700">
+                          <h1>{analysedData?.message?.header}</h1>
+                          {analysedData?.message?.lists && (
+                            <ol>
+                              {analysedData.message.lists.map((item, idx) => (
+                                <li key={idx}>
+                                  {idx + 1} : {item}
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+
+                        <div className="mt-4">
+                          <p className="text-sm text-gray-500 italic">
+                            Note: This is an AI-assisted analysis and should be
+                            reviewed by a qualified healthcare professional.
+                            This tool is not intended to replace clinical
+                            judgment or expertise.
+                          </p>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                      <Button className="bg-healthcare-blue hover:bg-opacity-90">
-                        Download Full Report
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="border-healthcare-blue text-healthcare-blue hover:bg-healthcare-soft-blue"
-                        onClick={removeFile}
-                      >
-                        Analyze Another Scan
-                      </Button>
-                    </div>
                   </div>
-                </div>
+                  <div className="mt-6 flex flex-col sm:flex-row gap-4">
+                    <Button
+                      onClick={downloadPDF}
+                      className="bg-healthcare-blue hover:bg-opacity-90"
+                    >
+                      Download Full Report
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-healthcare-blue text-healthcare-blue hover:bg-healthcare-soft-blue"
+                      onClick={removeFile}
+                    >
+                      Analyze Another Scan
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
 

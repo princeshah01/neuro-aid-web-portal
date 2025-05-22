@@ -11,7 +11,7 @@ import { useChatbot } from "@/context/ChatbotProvider";
 interface Message {
   id: string;
   role: "user" | "ai";
-  content: string;
+  content: any;
   timestamp: Date;
 }
 
@@ -27,12 +27,14 @@ const ChatWithPdf = () => {
   const [isFileUploaded, setIsFileUploaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isOpen, toggleChatbot } = useChatbot();
+  const [sessionId, setSessionId] = useState("");
   // Auto-scroll to bottom when new messages arrive
+  console.log(sessionId);
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleFileUpload = (file: File) => {
+  const handleFileUpload = async (file: File) => {
     // Check if file is a PDF
     if (file.type !== "application/pdf") {
       toast({
@@ -47,34 +49,58 @@ const ChatWithPdf = () => {
     setIsUploading(true);
     setUploadedFile(file);
 
-    // Simulate upload process
-    setTimeout(() => {
+    try {
+      // Create FormData and append file
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Make API call to upload and process PDF
+      const response = await fetch(
+        "http://localhost:5000/api/chat-pdf/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Upload failed");
+      }
+
+      // Save session ID
+      const sessionId = data.session_id;
+      setSessionId(sessionId); // Assuming you have setSessionId in your state
+
       setIsUploading(false);
-      setIsProcessing(true);
+      setIsProcessing(false);
+      setIsFileUploaded(true);
 
-      // Simulate processing
-      setTimeout(() => {
-        setIsProcessing(false);
-        setIsFileUploaded(true);
+      // Add initial message from AI
+      const initialMessage: Message = {
+        id: Date.now().toString(),
+        role: "ai",
+        content: `I've analyzed your uploaded document "${file.name}". You can now ask questions about it.`,
+        timestamp: new Date(),
+      };
+      setMessages([initialMessage]);
 
-        // Add initial message from AI
-        const initialMessage: Message = {
-          id: Date.now().toString(),
-          role: "ai",
-          content: `I've analyzed your uploaded document "${file.name}". It appears to be a medical report containing MRI findings. How can I help you understand this document?`,
-          timestamp: new Date(),
-        };
-
-        setMessages([initialMessage]);
-
-        toast({
-          title: "File processed successfully",
-          description:
-            "Your PDF has been processed. You can now ask questions about it.",
-          duration: 5000,
-        });
-      }, 2000);
-    }, 2000);
+      toast({
+        title: "File processed successfully",
+        description: "Your PDF has been uploaded and session started.",
+        duration: 5000,
+      });
+    } catch (error) {
+      setIsUploading(false);
+      setIsProcessing(false);
+      toast({
+        variant: "destructive",
+        title: "Upload Failed",
+        description: error.message || "Something went wrong while uploading.",
+        duration: 5000,
+      });
+    }
   };
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
@@ -110,67 +136,85 @@ const ChatWithPdf = () => {
     setMessages([]);
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!message.trim()) return;
 
-    // Add user message
+    const trimmedMessage = message.trim();
+    console.log(trimmedMessage);
+
+    // Add user message immediately
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: message,
+      content: trimmedMessage,
       timestamp: new Date(),
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setMessage("");
 
-    // Simulate AI thinking
-    setTimeout(() => {
-      // Generate AI response based on user query
-      let response = "";
-      const lowerCaseMessage = message.toLowerCase();
+    try {
+      // Add a temporary AI "typing..." message
+      const thinkingMessage: Message = {
+        id: "thinking",
+        role: "ai",
+        content: "Thinking...",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, thinkingMessage]);
 
-      if (
-        lowerCaseMessage.includes("normal") ||
-        lowerCaseMessage.includes("findings")
-      ) {
-        response =
-          "The report indicates normal findings for ventricles, white matter, gray-white junctions, and major vessel flow voids. There are no abnormal signal intensities, mass effects, or midline shifts observed. The cerebellar tonsils are normally positioned.";
-      } else if (
-        lowerCaseMessage.includes("tumor") ||
-        lowerCaseMessage.includes("cancer")
-      ) {
-        response =
-          "Good news! This MRI report does not show any evidence of tumor or cancer. There are no masses, abnormal enhancements, or lesions described in the findings.";
-      } else if (
-        lowerCaseMessage.includes("next") ||
-        lowerCaseMessage.includes("follow")
-      ) {
-        response =
-          "Based on these normal findings, standard follow-up is recommended. The radiologist suggests a routine follow-up MRI in 12 months to monitor any potential changes, though this is precautionary as no concerning findings were identified in this scan.";
-      } else if (
-        lowerCaseMessage.includes("explain") ||
-        lowerCaseMessage.includes("summary")
-      ) {
-        response =
-          "In summary, this is a normal brain MRI without any concerning findings. All brain structures appear normal, ventricles are of normal size and configuration, and there are no signs of masses, lesions, bleeding, or inflammation. This is a reassuring result indicating normal brain anatomy and function.";
-      } else {
-        response =
-          "I've analyzed the document carefully. The MRI report shows normal brain structures with no evidence of abnormalities. All ventricles are normal in size and configuration, and there are no lesions, masses, or abnormal signal intensities detected. Is there any specific aspect of the report you'd like me to explain in more detail?";
+      // Make the API call with the message
+      const response = await fetch(
+        `http://localhost:5000/api/chat-pdf/ask/${sessionId}`, // ensure sessionId is defined in your state
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: trimmedMessage }),
+        }
+      );
+
+      const data = await response.json();
+
+      // Remove "Thinking..." message
+      setMessages((prev) => prev.filter((msg) => msg.id !== "thinking"));
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to get AI response.");
       }
 
-      // Add AI response
+      // Add AI's response from API
       const aiMessage: Message = {
         id: Date.now().toString(),
         role: "ai",
-        content: response,
+        content: data.answer,
         timestamp: new Date(),
       };
-
       setMessages((prev) => [...prev, aiMessage]);
-    }, 1500);
+    } catch (error: any) {
+      // Remove "Thinking..." message
+      setMessages((prev) => prev.filter((msg) => msg.id !== "thinking"));
+
+      // Show fallback AI error message
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: "ai",
+        content: "Sorry, I couldn’t process your request. Please try again.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+
+      // Optionally show a toast
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description:
+          error.message || "Something went wrong while getting a response.",
+        duration: 5000,
+      });
+    }
   };
 
   return (
@@ -320,7 +364,22 @@ const ChatWithPdf = () => {
                                 : "bg-white border border-gray-200 text-gray-800"
                             }`}
                           >
-                            <p>{msg.content}</p>
+                            {msg.role === "user" ? (
+                              <p>{msg.content}</p>
+                            ) : (
+                              <>
+                                <p>{msg?.content?.message}</p>
+                                <p>{msg?.content?.description}</p>
+                                {msg?.content?.lists &&
+                                  msg.content.lists.length > 0 && (
+                                    <ul>
+                                      {msg.content.lists.map((item, index) => (
+                                        <li key={index}>{item}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                              </>
+                            )}
                             <p className="text-xs opacity-70 mt-1">
                               {msg.timestamp.toLocaleTimeString([], {
                                 hour: "2-digit",
@@ -337,7 +396,7 @@ const ChatWithPdf = () => {
                     <div className="border-t border-gray-200 p-4">
                       <form
                         onSubmit={handleSendMessage}
-                        className="flex space-x-2"
+                        className="flex gap-2 items-center mt-4"
                       >
                         <input
                           type="text"
@@ -346,12 +405,12 @@ const ChatWithPdf = () => {
                           placeholder="Ask a question about your document..."
                           className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-healthcare-blue"
                         />
-                        <Button
+                        <button
                           type="submit"
-                          className="bg-healthcare-blue hover:bg-opacity-90"
+                          className="px-4 py-2 bg-healthcare-blue text-white rounded-md hover:bg-blue-600"
                         >
-                          <Send className="h-5 w-5" />
-                        </Button>
+                          Send
+                        </button>
                       </form>
                     </div>
                   </div>

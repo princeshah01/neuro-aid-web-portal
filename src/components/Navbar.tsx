@@ -16,13 +16,16 @@ const Navbar = ({ scroll }) => {
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center -space-x-[3.3rem]">
+          <Link to="/" className="flex items-center gap-2">
             <div className="w-[4.5rem] h-10 p-2 bg-healthcare-blue rounded-full flex items-center justify-start">
-              <span className="font-bold text-xl">T</span>
-            </div>
-            <span className="text-xl font-semibold text-gray-800">
-              umor Talk
+              <span className="font-bold text-xl text-white">T</span>
+
+            <span className="text-xl font-semibold text-white">
+              umor 
             </span>
+            </div>
+            <span className="text-xl font-semibold text-healthcare-blue">Talk</span>
+            
           </Link>
 
           {/* Desktop Navigation */}
