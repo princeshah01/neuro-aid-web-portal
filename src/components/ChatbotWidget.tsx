@@ -1,140 +1,145 @@
+import React, { useState, useRef, useEffect } from "react";
+import { MessageSquare, Send, X, Upload, ChevronRight } from "lucide-react";
+import { Button } from "./ui/button";
 
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Upload, ChevronRight } from 'lucide-react';
-import { Button } from './ui/button';
-
-// Mock chat messages
 const initialMessages = [
   {
     id: 1,
-    sender: 'bot',
-    content: 'Hello! I\'m NeuroScan Assistant. How can I help you today?',
-    timestamp: new Date().toISOString()
-  }
+    sender: "bot",
+    content: "Hello! I'm NeuroScan Assistant. How can I help you today?",
+    timestamp: new Date().toISOString(),
+  },
 ];
 
 interface Message {
   id: number;
-  sender: 'user' | 'bot';
+  sender: "user" | "bot";
   content: string;
   timestamp: string;
 }
 
-const ChatbotWidget = () => {
-  const [isChatOpen, setIsChatOpen] = useState(false);
+interface ChatbotWidgetProps {
+  isOpen: boolean;
+  toggleChat: () => void;
+}
+
+const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
+  isOpen,
+  toggleChat,
+}) => {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  const toggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-  };
+  const handleSendMessage = async () => {
+    if (newMessage.trim() === "") return;
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() === '') return;
-
-    // Add user message
-    const userMessageObj = {
+    const userMessage: Message = {
       id: messages.length + 1,
-      sender: 'user' as const,
+      sender: "user",
       content: newMessage,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    setMessages([...messages, userMessageObj]);
-    setNewMessage('');
-    
-    // Simulate bot typing
+    setMessages((prev) => [...prev, userMessage]);
+    setNewMessage("");
     setIsTyping(true);
-    
-    // Choose response based on message content
-    setTimeout(() => {
-      setIsTyping(false);
-      
-      let botResponse;
-      const lowerCaseMessage = newMessage.toLowerCase();
-      
-      if (lowerCaseMessage.includes('tumor') || lowerCaseMessage.includes('scan') || lowerCaseMessage.includes('mri')) {
-        botResponse = "I'd be happy to help analyze your brain scan. Please upload your MRI image, and I'll examine it for potential tumor indicators.";
-      } else if (lowerCaseMessage.includes('hello') || lowerCaseMessage.includes('hi')) {
-        botResponse = "Hello! I'm NeuroScan's AI assistant. I can help analyze brain MRIs or answer questions about our tumor classification system. How can I assist you today?";
-      } else if (lowerCaseMessage.includes('service') || lowerCaseMessage.includes('pdf')) {
-        botResponse = "We offer two primary services: AI Tumor Classification from MRI scans and our Chat with PDF feature that lets you upload medical reports for AI analysis.";
-      } else {
-        botResponse = "Thank you for your message. For specific medical analysis, please upload an MRI scan or medical report, and I'll analyze it for you. Is there anything else you'd like to know about our services?";
-      }
-      
-      const botMessageObj = {
+
+    try {
+      const response = await fetch("http://127.0.0.1:5000/api/chatbot", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: newMessage }),
+      });
+
+      const data = await response.json();
+
+      const botMessage: Message = {
         id: messages.length + 2,
-        sender: 'bot' as const,
-        content: botResponse,
-        timestamp: new Date().toISOString()
+        sender: "bot",
+        content: data.response || "Sorry, I couldn't understand that.",
+        timestamp: new Date().toISOString(),
       };
-      
-      setMessages(prev => [...prev, botMessageObj]);
-    }, 1500);
+
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (error) {
+      console.error("API Error:", error);
+
+      const errorMessage: Message = {
+        id: messages.length + 2,
+        sender: "bot",
+        content: "Oops! Something went wrong. Please try again later.",
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleFileUpload = () => {
-    // Simulate file upload process
-    const fileUploadMessage = {
+    const fileMessage: Message = {
       id: messages.length + 1,
-      sender: 'user' as const,
-      content: 'Uploaded: brain_scan.jpg',
-      timestamp: new Date().toISOString()
+      sender: "user",
+      content: "Uploaded: brain_scan.jpg",
+      timestamp: new Date().toISOString(),
     };
-    
-    setMessages([...messages, fileUploadMessage]);
-    
-    // Simulate bot analysis
+
+    setMessages([...messages, fileMessage]);
     setIsTyping(true);
-    
+
     setTimeout(() => {
       setIsTyping(false);
-      
-      const analysisMessage = {
+
+      const analysisMessage: Message = {
         id: messages.length + 2,
-        sender: 'bot' as const,
-        content: 'Analyzing your scan... Based on my initial analysis, I don\'t detect signs of a malignant tumor. However, there is a small region of interest that should be reviewed by a specialist. I recommend scheduling a follow-up with your neurologist to discuss these findings.',
-        timestamp: new Date().toISOString()
+        sender: "bot",
+        content:
+          "Analyzing your scan... Based on my initial analysis, I don't detect signs of a malignant tumor. However, there is a small region of interest that should be reviewed by a specialist. I recommend scheduling a follow-up with your neurologist.",
+        timestamp: new Date().toISOString(),
       };
-      
-      setMessages(prev => [...prev, analysisMessage]);
+
+      setMessages((prev) => [...prev, analysisMessage]);
     }, 3000);
   };
 
   return (
     <>
-      {/* Chat toggle button */}
+      {/* Toggle Button */}
       <button
         className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all ${
-          isChatOpen ? 'bg-gray-600' : 'bg-healthcare-blue hover:bg-healthcare-blue/90'
+          isOpen
+            ? "bg-gray-600"
+            : "bg-healthcare-blue hover:bg-healthcare-blue/90"
         }`}
         onClick={toggleChat}
       >
-        {isChatOpen ? (
+        {isOpen ? (
           <X className="h-6 w-6 text-white" />
         ) : (
           <MessageSquare className="h-6 w-6 text-white" />
         )}
       </button>
 
-      {/* Chat window */}
+      {/* Chat Window */}
       <div
         className={`fixed bottom-24 right-6 z-50 w-[350px] sm:w-[380px] max-h-[500px] rounded-lg shadow-xl bg-white border border-gray-200 overflow-hidden transition-all transform ${
-          isChatOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
+          isOpen
+            ? "scale-100 opacity-100"
+            : "scale-95 opacity-0 pointer-events-none"
         }`}
       >
-        {/* Chat header */}
+        {/* Header */}
         <div className="bg-healthcare-blue p-4 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -146,10 +151,10 @@ const ChatbotWidget = () => {
                 <p className="text-xs opacity-75">Online</p>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={toggleChat} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleChat}
               className="text-white hover:bg-white/20"
             >
               <X className="h-5 w-5" />
@@ -157,28 +162,33 @@ const ChatbotWidget = () => {
           </div>
         </div>
 
-        {/* Chat messages */}
+        {/* Messages */}
         <div className="p-4 overflow-y-auto h-[300px]">
-          {messages.map((message) => (
+          {messages.map((msg) => (
             <div
-              key={message.id}
-              className={`mb-4 flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              key={msg.id}
+              className={`mb-4 flex ${
+                msg.sender === "user" ? "justify-end" : "justify-start"
+              }`}
             >
               <div
                 className={`max-w-[80%] rounded-lg p-3 ${
-                  message.sender === 'user'
-                    ? 'bg-healthcare-blue text-white'
-                    : 'bg-gray-100 text-gray-800'
+                  msg.sender === "user"
+                    ? "bg-healthcare-blue text-white"
+                    : "bg-gray-100 text-gray-800"
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm">{msg.content}</p>
                 <span className="text-xs opacity-70 block mt-1">
-                  {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(msg.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             </div>
           ))}
-          
+
           {/* Typing indicator */}
           {isTyping && (
             <div className="mb-4 flex justify-start">
@@ -191,29 +201,31 @@ const ChatbotWidget = () => {
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
         {/* Quick actions */}
         <div className="px-4 py-2 border-t border-gray-200">
           <div className="flex space-x-2 overflow-x-auto pb-2">
-            <button 
-              className="text-xs px-3 py-1.5 bg-healthcare-soft-blue text-healthcare-blue rounded-full whitespace-nowrap flex items-center"
-              onClick={() => setNewMessage("How does tumor classification work?")}
+            <button
+              className="text-xs px-3 py-1.5 bg-healthcare-soft-blue text-healthcare-blue rounded-full flex items-center"
+              onClick={() =>
+                setNewMessage("How does tumor classification work?")
+              }
             >
               <ChevronRight className="h-3 w-3 mr-1" />
               About classification
             </button>
-            <button 
-              className="text-xs px-3 py-1.5 bg-healthcare-soft-blue text-healthcare-blue rounded-full whitespace-nowrap flex items-center"
+            <button
+              className="text-xs px-3 py-1.5 bg-healthcare-soft-blue text-healthcare-blue rounded-full flex items-center"
               onClick={() => setNewMessage("What file formats do you support?")}
             >
               <ChevronRight className="h-3 w-3 mr-1" />
               File formats
             </button>
-            <button 
-              className="text-xs px-3 py-1.5 bg-healthcare-soft-blue text-healthcare-blue rounded-full whitespace-nowrap flex items-center"
+            <button
+              className="text-xs px-3 py-1.5 bg-healthcare-soft-blue text-healthcare-blue rounded-full flex items-center"
               onClick={handleFileUpload}
             >
               <ChevronRight className="h-3 w-3 mr-1" />
@@ -225,20 +237,19 @@ const ChatbotWidget = () => {
         {/* Chat input */}
         <div className="p-4 border-t border-gray-200">
           <div className="flex space-x-2">
-            <button 
+            <button
               className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
               onClick={handleFileUpload}
             >
               <Upload className="h-5 w-5 text-gray-600" />
             </button>
-            
             <div className="flex-1 relative">
               <input
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') handleSendMessage();
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSendMessage();
                 }}
                 placeholder="Type a message..."
                 className="w-full py-2 px-3 rounded-full border border-gray-300 focus:outline-none focus:ring-1 focus:ring-healthcare-blue pr-10"

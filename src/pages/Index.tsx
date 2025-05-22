@@ -3,47 +3,20 @@ import Features from "@/components/Features";
 import Footer from "@/components/Footer";
 import Hero from "@/components/Hero";
 import Navbar from "@/components/Navbar";
-import Testimonials from "@/components/Testimonials";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-
+import useBlurOnScroll from "@/hooks/useBlurOnScroll";
+import { useChatbot } from "@/context/ChatbotProvider";
+import { BackgroundBeams } from "@/components/ui/background";
 const Index = () => {
-  const [blurNav, setBlurNav] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (typeof window !== "undefined") {
-        if (window.scrollY > 0) {
-          // User has scrolled even a little
-          setBlurNav(true);
-        } else {
-          // User is at the very top
-          setBlurNav(false);
-        }
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
-
+  const blurNav = useBlurOnScroll();
+  const { isOpen, toggleChatbot } = useChatbot();
   return (
     <>
       <div className="relative w-full bg-gradient-to-b from-healthcare-soft-blue to-white">
-        <div
-          className={cn(
-            "absolute inset-0",
-            "[background-size:80px_80px]",
-            "[background-image:linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)]",
-            "dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)]"
-          )}
-        />
+        <BackgroundBeams />
         {/* Radial gradient for the container to give a faded look */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)] dark:bg-black"></div>
 
@@ -55,7 +28,7 @@ const Index = () => {
       {/* How It Works Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center max-w-3xl mx-auto">
+          <div className="text-center max-w-3xl mx-auto gap-5 flex flex-col">
             <h2 className="text-3xl font-bold text-gray-800">How It Works</h2>
             <p className="mt-4 text-lg text-gray-600">
               Our advanced AI system provides fast and accurate tumor
@@ -63,7 +36,7 @@ const Index = () => {
             </p>
           </div>
 
-          <div className="mt-12">
+          <div className="mt-12 mb-[10rem]">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 {
@@ -221,7 +194,7 @@ const Index = () => {
               </div>
             </div>
 
-            <div className="md:w-1/2">
+            <div className="md:w-1/2  ">
               <div className="bg-white rounded-lg shadow-xl border border-healthcare-gray p-4">
                 <div className="bg-healthcare-soft-blue rounded-lg p-5">
                   <div className="flex items-center mb-4">
@@ -270,6 +243,7 @@ const Index = () => {
                   <div className="relative">
                     <input
                       type="text"
+                      disabled
                       placeholder="Ask about your medical report..."
                       className="w-full border border-gray-300 rounded-lg p-3 pr-12 focus:outline-none focus:ring-2 focus:ring-healthcare-blue"
                     />
@@ -295,42 +269,10 @@ const Index = () => {
             </div>
           </div>
         </div>
+        <div className="h-[10rem]"></div>
       </section>
-
-      <Testimonials />
-
-      {/* CTA Section */}
-      <section className="py-16 bg-healthcare-blue">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-white">
-            Ready to transform your diagnostic process?
-          </h2>
-          <p className="mt-4 text-lg text-white/80 max-w-2xl mx-auto">
-            Join thousands of healthcare professionals already using our
-            AI-powered platform for faster, more accurate brain tumor
-            classification.
-          </p>
-
-          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              size="lg"
-              className="bg-white text-healthcare-blue hover:bg-opacity-90"
-            >
-              <Link to="/services/tumor-classifier">Try Tumor Classifier</Link>
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-white text-white hover:bg-white/20"
-            >
-              <Link to="/contact">Contact Sales</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
       <Footer />
-      <ChatbotWidget />
+      <ChatbotWidget isOpen={isOpen} toggleChat={toggleChatbot} />
     </>
   );
 };
